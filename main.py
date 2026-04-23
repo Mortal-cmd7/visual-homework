@@ -11,7 +11,7 @@ from ultralytics import YOLO
 from ultralytics.utils import LOGGER
 from ultralytics.utils.plotting import Annotator, colors
 
-# ==================== 全局常量与样式配置 ====================
+# 全局常量与样式配置 
 MODEL_PATH = "yolo26n-pose.pt"
 DEFAULT_DEVICE = "cpu"
 DEFAULT_CONF_THRESH = 0.3
@@ -27,7 +27,7 @@ LINE_THICKNESS = 2
 TEXT_BG_ALPHA = 0.6
 TRACK_LEN = 30
 
-# COCO 姿态关键点连接关系（用于绘制骨架）
+# COCO 姿态关键点连接关系
 SKELETON = [
     (15, 13), (13, 11), (16, 14), (14, 12), (11, 12), (5, 11), (6, 12),
     (5, 6), (5, 7), (6, 8), (7, 9), (8, 10), (1, 2), (0, 1), (0, 2),
@@ -37,7 +37,6 @@ SKELETON = [
 
 @dataclass
 class TargetInfo:
-    """选中的跟踪目标信息"""
     track_id: Optional[int] = None
     class_id: Optional[int] = None
     class_name: Optional[str] = None
@@ -47,7 +46,6 @@ class TargetInfo:
 
 @dataclass
 class Detection:
-    """单帧检测结果的数据结构"""
     x1: int
     y1: int
     x2: int
@@ -59,7 +57,6 @@ class Detection:
 
 
 class CalibrationParams:
-    """距离标定参数管理类"""
     def __init__(self, ref_dist_m: float = 2.0, ref_height_px: int = 200):
         self.ref_dist_m = ref_dist_m
         self.ref_height_px = ref_height_px
@@ -69,14 +66,12 @@ class CalibrationParams:
         self.ref_height_px = bbox_height_px
 
     def estimate_distance(self, bbox_height_px: int) -> Optional[float]:
-        """根据边界框高度估算距离"""
         if bbox_height_px <= 0 or self.ref_height_px <= 0:
             return None
         return self.ref_dist_m * (self.ref_height_px / bbox_height_px)
 
 
 class TrackingUI:
-    """UI 绘制辅助类"""
     def __init__(self, class_names: Dict[int, str]):
         self.class_names = class_names
 
@@ -89,7 +84,7 @@ class TrackingUI:
         bg_color: Tuple[int, int, int] = (0, 0, 0),
         alpha: float = TEXT_BG_ALPHA
     ) -> None:
-        """绘制带半透明背景的文字"""
+
         (tw, th), baseline = cv2.getTextSize(text, FONT, FONT_SCALE, FONT_THICKNESS)
         x, y = pos
         overlay = img.copy()
@@ -106,7 +101,7 @@ class TrackingUI:
         is_paused: bool = False,
         is_calibrating: bool = False
     ) -> None:
-        """绘制顶部信息面板"""
+
         h, w = frame.shape[:2]
         panel_height = 80
         overlay = frame.copy()
@@ -143,7 +138,7 @@ class TrackingUI:
         distance: Optional[float],
         color: Tuple[int, int, int]
     ) -> None:
-        """在边界框上方绘制距离信息"""
+
         if distance is None or np.isinf(distance):
             text = "Dist: N/A"
         else:
@@ -200,7 +195,6 @@ class VideoProcessor:
         self._last_time = time.perf_counter()
 
     def init_model(self) -> None:
-        """加载模型并配置"""
         LOGGER.info(f"Loading pose model {MODEL_PATH} on {self.device}")
         if not Path(MODEL_PATH).exists():
             LOGGER.warning(f"Model file {MODEL_PATH} not found locally. Attempting to download...")
@@ -211,7 +205,6 @@ class VideoProcessor:
         self.ui = TrackingUI(self.class_names)
 
     def mouse_callback(self, event: int, x: int, y: int, flags: int, param) -> None:
-        """鼠标点击：选中目标或标定参考物"""
         if event != cv2.EVENT_LBUTTONDOWN or self.paused:
             return
         if not self.latest_detections:
@@ -236,14 +229,12 @@ class VideoProcessor:
             self._handle_selection(best_match)
 
     def _handle_selection(self, det: Detection) -> None:
-        """处理正常模式下的目标选中"""
         self.selected_target.track_id = det.track_id
         self.selected_target.class_id = det.class_id
         self.selected_target.class_name = self.class_names[det.class_id]
         LOGGER.info(f"Selected target ID={det.track_id}, Class={self.selected_target.class_name}")
 
     def _handle_calibration(self, det: Detection) -> None:
-        """处理标定模式：输入实际距离并更新参数"""
         bbox_height = det.y2 - det.y1
         class_name = self.class_names[det.class_id]
         print(f"\n[标定模式] 选中目标：ID={det.track_id}, 类别={class_name}, 像素高度={bbox_height}px")
@@ -259,7 +250,7 @@ class VideoProcessor:
             return
 
         self.calib_params.update(real_dist, bbox_height)
-        print(f"✅ 标定完成！参考距离 = {self.calib_params.ref_dist_m}m, "
+        print(f" 标定完成，参考距离 = {self.calib_params.ref_dist_m}m, "
               f"参考像素高度 = {self.calib_params.ref_height_px}px")
         self.calibration_mode = False
 
@@ -268,7 +259,7 @@ class VideoProcessor:
         return (x1 + x2) // 2, (y1 + y2) // 2
 
     def process_frame(self, frame: np.ndarray) -> np.ndarray:
-        """处理单帧图像，返回标注后的帧"""
+        #处理单帧图像，返回标注后的帧
         if self.paused:
             return frame
 
@@ -354,7 +345,6 @@ class VideoProcessor:
         return frame
 
     def _parse_results(self, results) -> List[Detection]:
-        """将 Ultralytics 推理结果转换为 Detection 列表"""
         detections = []
         if results[0].boxes is None:
             return detections
@@ -384,7 +374,6 @@ class VideoProcessor:
         return detections
 
     def _update_fps(self) -> None:
-        """更新帧率计算"""
         self.frame_count += 1
         if self.frame_count % 10 == 0:
             now = time.perf_counter()
@@ -393,7 +382,6 @@ class VideoProcessor:
 
     @staticmethod
     def draw_skeleton(frame: np.ndarray, kpts: np.ndarray, color: Tuple[int, int, int] = (0, 255, 0)) -> None:
-        """绘制关键点和骨架连线"""
         # 绘制关键点
         for x, y, conf in kpts:
             if conf > 0.5:
@@ -406,7 +394,6 @@ class VideoProcessor:
                 cv2.line(frame, pt1, pt2, color, 2)
 
     def run(self) -> None:
-        """主循环"""
         self.init_model()
 
         # 打开视频源
